@@ -51,12 +51,28 @@
 ;;;; Variables
 
 (defconst topsy-header-line-format
-  '(:eval (list (propertize " " 'display '((space :align-to 0)))
-                (funcall topsy-fn)))
+  '(:eval (unless (= 1 (window-start))
+            (let* ((bg (face-attribute 'mode-line-inactive :background))
+                   (underline (list :style 'dots :position -1 :color (face-attribute 'mode-line :background)))
+                   (height (face-attribute 'default :height)))
+              (list (propertize
+                     " "
+                     'display '((space :align-to 0))
+                     'face `(:underline ,underline :background ,bg))
+                    (let ((s (funcall topsy-fn)))
+                      (add-face-text-property 0 (length s) `(:height ,height :background ,bg :underline ,underline) t s)
+                      s)
+                    (propertize
+                     " "
+                     'display '((space :align-to most-positive-fixnum))
+                     'face `(:underline ,underline :background ,bg))))))
   "The header line format used by `topsy-mode'.")
 (put 'topsy-header-line-format 'risky-local-variable t)
 
 (defvar-local topsy-old-hlf nil
+  "Preserves the old value of `header-line-format'.")
+
+(defvar-local topsy-old-hl-background nil
   "Preserves the old value of `header-line-format'.")
 
 (defvar-local topsy-fn nil
@@ -98,6 +114,8 @@ Return non-nil if the minor mode is enabled."
           ;; Save previous buffer local value of header line format.
           (setf topsy-old-hlf header-line-format))
         ;; Enable the mode
+        (setf topsy-old-hl-background (face-attribute 'header-line :background))
+        (set-face-attribute 'header-line nil :background (face-attribute 'default :background) :height 0.1)
         (setf topsy-fn (or (alist-get major-mode topsy-mode-functions)
                            (alist-get nil topsy-mode-functions))
               header-line-format 'topsy-header-line-format))
@@ -105,6 +123,7 @@ Return non-nil if the minor mode is enabled."
     (when (eq header-line-format 'topsy-header-line-format)
       ;; Restore previous buffer local value of header line format if
       ;; the current one is the sticky func one.
+      (set-face-attribute 'header-line nil :background topsy-old-hl-background :height 'unspecified)
       (kill-local-variable 'header-line-format)
       (when topsy-old-hlf
         (setf header-line-format topsy-old-hlf
